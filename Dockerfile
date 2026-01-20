@@ -18,12 +18,6 @@ RUN pnpm install --frozen-lockfile
 FROM base AS builder
 WORKDIR /app
 
-# 注入代理变量（可选，用于构建时访问外部资源）
-ARG HTTP_PROXY
-ARG HTTPS_PROXY
-ENV http_proxy=$HTTP_PROXY
-ENV https_proxy=$HTTPS_PROXY
-
 # 从 deps 阶段复制 node_modules
 COPY --from=deps /app/node_modules ./node_modules
 # 复制项目文件
@@ -31,11 +25,6 @@ COPY . .
 
 # 禁用 Next.js 遥测
 ENV NEXT_TELEMETRY_DISABLED=1
-
-# 临时屏蔽字体下载逻辑（解决网络连接失败问题，不修改本地业务代码）
-RUN sed -i 's/const _dmSans =/ \/\/ const _dmSans =/g' app/layout.tsx && \
-    sed -i 's/const _spaceMono =/ \/\/ const _spaceMono =/g' app/layout.tsx && \
-    sed -i 's/const _sourceSerif_4 =/ \/\/ const _sourceSerif_4 =/g' app/layout.tsx
 
 # 执行构建
 RUN pnpm build
