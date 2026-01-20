@@ -1,32 +1,61 @@
-# ===========================
-# Stage 1: 构建阶段
-# ===========================
-FROM registry.cn-shanghai.aliyuncs.com/qianxing-fe/node:20-alpine AS builder
-ARG APP_ENV=production
+# 使用官方 Node.js 18 LTS 镜像作为基础镜像
+FROM registry.cn-shanghai.aliyuncs.com/qianxing-fe/node:20-alpine AS base
+
+# 安装依赖阶段
+FROM base AS deps
+# 添加 libc6-compat 以支持某些原生模块（如 sharp）
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
-# 安装 pnpm（使用全局安装）
-RUN npm install -g pnpm
-# 仅复制依赖文件（充分利用缓存）
-COPY package.json ./
-# 安装依赖（可使用淘宝镜像加速）
-RUN pnpm install --registry=https://registry.npmmirror.com
-# 复制源码
+
+# 复制依赖配置文件
+COPY package.json package-lock.json* ./
+
+# 安装依赖
+RUN npm ci
+
+# 构建阶段
+FROM base AS builder
+WORKDIR /app
+
+# 从 deps 阶段复制 node_modules
+COPY --from=deps /app/node_modules ./node_modules
+# 复制项目文件
 COPY . .
-# 构建项目（根据环境调整命令）
-RUN APP_ENV=${APP_ENV} pnpm run build
-# ===========================
-# Stage 2: 运行阶段
-# ===========================
-FROM registry.cn-shanghai.aliyuncs.com/qianxing-fe/node:20-alpine AS runner
+
+# 禁用 Next.js 遥测
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# 执行构建
+RUN npm run build
+
+# 生产运行阶段
+FROM base AS runner
 WORKDIR /app
-ENV PORT=3333
-# 从构建阶段复制 standalone 产物
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# 创建非 root 用户
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# 复制构建产物
+COPY --from=builder /app/public ./public
+
+# 设置正确的权限并复制预渲染缓存
+RUN mkdir .next
+RUN chown nextjs:nodejs .next
+
+# 自动利用输出跟踪来减少镜像大小
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-# 暴露端口
-EXPOSE 3333
-# 使用 root 用户运行（默认就是 root，可显式声明）
-USER root
-# 启动 Next.js 服务
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+# 启动应用
 CMD ["node", "server.js"]
