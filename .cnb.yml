@@ -1,0 +1,3 @@
+#流水线配置
+include:
+  - https://cnb.cool/100x-agent.ai/config/pipeline/-/blob/main/website/XXXX/main.pipeline.yml
