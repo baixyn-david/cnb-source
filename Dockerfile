@@ -1,5 +1,6 @@
 # 使用官方 Node.js 18 LTS 镜像作为基础镜像
 FROM registry.cn-shanghai.aliyuncs.com/qianxing-fe/node:20-alpine AS base
+RUN npm install -g pnpm
 
 # 安装依赖阶段
 FROM base AS deps
