@@ -9,7 +9,7 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # 复制依赖配置文件
-COPY package.json pnpm-lock.yaml ./
+COPY package.json ./
 
 # 安装依赖
 RUN pnpm install
